@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="An interactive 3D particle simulation with gravitational physics">
+    <meta name="author" content="Cosmic Gravity Garden">
+    <title>Cosmic Gravity Garden - Interactive Gravity Simulation</title>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Import map for Three.js modules -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <!-- Main container for the 3D scene -->
+    <div id="container"></div>
+
+    <!-- Info overlay -->
+    <div id="info">
+        <strong>🌌 Cosmic Gravity Garden</strong><br>
+        <strong style="color: #88ff88;">Click anywhere to add a gravity star!</strong><br>
+        Drag to pan • Scroll to zoom<br>
+        <br>
+        <small>Watch particles get pulled in dramatic motion</small>
+    </div>
+
+    <!-- Stats container -->
+    <div id="stats"></div>
+
+    <!-- Main application script -->
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>

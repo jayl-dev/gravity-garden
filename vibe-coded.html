@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Gravity Garden</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #container {
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            pointer-events: none;
+            text-shadow: 0 0 4px rgba(0, 0, 0, 0.8);
+        }
+
+        #stats {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="container"></div>
+    <div id="info">
+        Click anywhere to plant a star<br>
+        Drag to rotate | Scroll to zoom
+    </div>
+    <div id="stats"></div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // Scene, Camera, Renderer
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 50, 100);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        document.getElementById('container').appendChild(renderer.domElement);
+
+        // OrbitControls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 20;
+        controls.maxDistance = 300;
+
+        // Post-processing
+        const composer = new EffectComposer(renderer);
+        const renderPass = new RenderPass(scene, camera);
+        composer.addPass(renderPass);
+
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            1.2,  // strength
+            0.6,  // radius
+            0.2   // threshold
+        );
+        composer.addPass(bloomPass);
+
+        // Background Nebula Shader
+        const nebulaVertexShader = `
+            varying vec2 vUv;
+            void main() {
+                vUv = uv;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `;
+
+        const nebulaFragmentShader = `
+            uniform float time;
+            varying vec2 vUv;
+
+            // Simple noise function
+            float noise(vec2 p) {
+                return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+            }
+
+            void main() {
+                vec2 uv = vUv;
+
+                // Create gradient with time-based color cycling
+                float t = time * 0.05;
+                vec3 color1 = vec3(0.1 + 0.05 * sin(t), 0.0, 0.3 + 0.1 * cos(t * 0.7));
+                vec3 color2 = vec3(0.5 + 0.1 * sin(t * 0.8), 0.1, 0.6 + 0.1 * cos(t));
+                vec3 color3 = vec3(0.1, 0.2 + 0.1 * sin(t * 1.2), 0.4);
+
+                float mixFactor = uv.y;
+                vec3 finalColor = mix(color1, color2, mixFactor);
+                finalColor = mix(finalColor, color3, uv.x * 0.3);
+
+                // Add subtle noise
+                float n = noise(uv * 5.0 + t * 0.1) * 0.05;
+                finalColor += n;
+
+                gl_FragColor = vec4(finalColor, 1.0);
+            }
+        `;
+
+        const nebulaGeometry = new THREE.PlaneGeometry(500, 500);
+        const nebulaMaterial = new THREE.ShaderMaterial({
+            vertexShader: nebulaVertexShader,
+            fragmentShader: nebulaFragmentShader,
+            uniforms: {
+                time: { value: 0 }
+            },
+            side: THREE.DoubleSide
+        });
+        const nebulaMesh = new THREE.Mesh(nebulaGeometry, nebulaMaterial);
+        nebulaMesh.position.z = -100;
+        scene.add(nebulaMesh);
+
+        // Background Starfield
+        const starfieldGeometry = new THREE.BufferGeometry();
+        const starfieldCount = 300;
+        const starfieldPositions = new Float32Array(starfieldCount * 3);
+
+        for (let i = 0; i < starfieldCount; i++) {
+            starfieldPositions[i * 3] = (Math.random() - 0.5) * 400;
+            starfieldPositions[i * 3 + 1] = (Math.random() - 0.5) * 400;
+            starfieldPositions[i * 3 + 2] = -50 - Math.random() * 100;
+        }
+
+        starfieldGeometry.setAttribute('position', new THREE.BufferAttribute(starfieldPositions, 3));
+        const starfieldMaterial = new THREE.PointsMaterial({
+            color: 0xffffff,
+            size: 1,
+            transparent: true,
+            opacity: 0.6
+        });
+        const starfield = new THREE.Points(starfieldGeometry, starfieldMaterial);
+        scene.add(starfield);
+
+        // Attractor Class
+        class Attractor {
+            constructor(position, mass, color) {
+                this.pos = position.clone();
+                this.mass = mass;
+                this.color = color;
+
+                // Create visual representation
+                const geometry = new THREE.IcosahedronGeometry(mass * 2, 2);
+                const material = new THREE.MeshBasicMaterial({
+                    color: color,
+                    emissive: color,
+                    emissiveIntensity: 1.5
+                });
+                this.mesh = new THREE.Mesh(geometry, material);
+                this.mesh.position.copy(this.pos);
+                scene.add(this.mesh);
+
+                // Add glow sphere
+                const glowGeometry = new THREE.SphereGeometry(mass * 3, 16, 16);
+                const glowMaterial = new THREE.MeshBasicMaterial({
+                    color: color,
+                    transparent: true,
+                    opacity: 0.3
+                });
+                this.glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                this.glow.position.copy(this.pos);
+                scene.add(this.glow);
+            }
+
+            remove() {
+                scene.remove(this.mesh);
+                scene.remove(this.glow);
+                this.mesh.geometry.dispose();
+                this.mesh.material.dispose();
+                this.glow.geometry.dispose();
+                this.glow.material.dispose();
+            }
+        }
+
+        // Particle Class
+        class Particle {
+            constructor(position, velocity, color) {
+                this.pos = position.clone();
+                this.vel = velocity.clone();
+                this.color = color;
+                this.trail = [];
+                this.maxTrailLength = 20;
+            }
+
+            update(attractors, deltaTime, G) {
+                // Calculate gravitational forces from all attractors
+                const acceleration = new THREE.Vector3(0, 0, 0);
+
+                for (const attractor of attractors) {
+                    const direction = new THREE.Vector3().subVectors(attractor.pos, this.pos);
+                    const distanceSq = Math.max(direction.lengthSq(), 0.1); // Avoid division by zero
+                    const distance = Math.sqrt(distanceSq);
+
+                    // F = G * m1 * m2 / r^2, but for particles we assume m = 1
+                    const forceMagnitude = (G * attractor.mass) / distanceSq;
+
+                    // Clamp to avoid extreme accelerations
+                    const clampedForce = Math.min(forceMagnitude, 50);
+
+                    direction.normalize().multiplyScalar(clampedForce);
+                    acceleration.add(direction);
+                }
+
+                // Update velocity and position (Euler integration)
+                this.vel.add(acceleration.multiplyScalar(deltaTime));
+
+                // Velocity damping to prevent runaway speeds
+                const maxSpeed = 50;
+                if (this.vel.length() > maxSpeed) {
+                    this.vel.normalize().multiplyScalar(maxSpeed);
+                }
+
+                // Update trail
+                if (this.trail.length === 0 || this.pos.distanceTo(this.trail[this.trail.length - 1]) > 0.5) {
+                    this.trail.push(this.pos.clone());
+                    if (this.trail.length > this.maxTrailLength) {
+                        this.trail.shift();
+                    }
+                }
+
+                this.pos.add(this.vel.clone().multiplyScalar(deltaTime));
+            }
+        }
+
+        // Simulation parameters
+        const params = {
+            G: 10,
+            particleCount: 6000,
+            bloomStrength: 1.2,
+            trailLength: 20,
+            reset: resetSimulation
+        };
+
+        let attractors = [];
+        let particles = [];
+        let particleSystem;
+        let trailLines = [];
+
+        // Initialize particles
+        function initParticles() {
+            particles = [];
+
+            const colors = [
+                new THREE.Color(0.8, 0.6, 1.0),
+                new THREE.Color(0.6, 0.8, 1.0),
+                new THREE.Color(1.0, 0.7, 0.8),
+                new THREE.Color(0.7, 1.0, 0.9),
+                new THREE.Color(1.0, 0.9, 0.6)
+            ];
+
+            for (let i = 0; i < params.particleCount; i++) {
+                const pos = new THREE.Vector3(
+                    (Math.random() - 0.5) * 60,
+                    (Math.random() - 0.5) * 60,
+                    (Math.random() - 0.5) * 60
+                );
+                const vel = new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.5,
+                    (Math.random() - 0.5) * 0.5,
+                    (Math.random() - 0.5) * 0.5
+                );
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                particles.push(new Particle(pos, vel, color));
+            }
+
+            updateParticleSystem();
+        }
+
+        function updateParticleSystem() {
+            // Remove old particle system
+            if (particleSystem) {
+                scene.remove(particleSystem);
+                particleSystem.geometry.dispose();
+                particleSystem.material.dispose();
+            }
+
+            // Create new particle system
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particles.length * 3);
+            const colors = new Float32Array(particles.length * 3);
+
+            for (let i = 0; i < particles.length; i++) {
+                positions[i * 3] = particles[i].pos.x;
+                positions[i * 3 + 1] = particles[i].pos.y;
+                positions[i * 3 + 2] = particles[i].pos.z;
+
+                colors[i * 3] = particles[i].color.r;
+                colors[i * 3 + 1] = particles[i].color.g;
+                colors[i * 3 + 2] = particles[i].color.b;
+            }
+
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.PointsMaterial({
+                size: 1.5,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+
+            particleSystem = new THREE.Points(geometry, material);
+            scene.add(particleSystem);
+        }
+
+        function updateParticlePositions() {
+            if (!particleSystem) return;
+
+            const positions = particleSystem.geometry.attributes.position.array;
+
+            for (let i = 0; i < particles.length; i++) {
+                positions[i * 3] = particles[i].pos.x;
+                positions[i * 3 + 1] = particles[i].pos.y;
+                positions[i * 3 + 2] = particles[i].pos.z;
+            }
+
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+        }
+
+        function updateTrails() {
+            // Remove old trail lines
+            trailLines.forEach(line => {
+                scene.remove(line);
+                line.geometry.dispose();
+                line.material.dispose();
+            });
+            trailLines = [];
+
+            // Only draw trails for a subset of particles for performance
+            const trailStep = Math.max(1, Math.floor(particles.length / 500));
+
+            for (let i = 0; i < particles.length; i += trailStep) {
+                const particle = particles[i];
+                if (particle.trail.length < 2) continue;
+
+                const points = particle.trail.slice(-params.trailLength);
+                const geometry = new THREE.BufferGeometry().setFromPoints(points);
+                const material = new THREE.LineBasicMaterial({
+                    color: particle.color,
+                    transparent: true,
+                    opacity: 0.3,
+                    blending: THREE.AdditiveBlending
+                });
+                const line = new THREE.Line(geometry, material);
+                scene.add(line);
+                trailLines.push(line);
+            }
+        }
+
+        function resetSimulation() {
+            // Remove all attractors
+            attractors.forEach(attractor => attractor.remove());
+            attractors = [];
+
+            // Reinitialize particles
+            initParticles();
+
+            // Clear trails
+            trailLines.forEach(line => {
+                scene.remove(line);
+                line.geometry.dispose();
+                line.material.dispose();
+            });
+            trailLines = [];
+        }
+
+        // Raycaster for mouse interaction
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const interactionPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+
+        renderer.domElement.addEventListener('click', (event) => {
+            // Calculate mouse position in normalized device coordinates
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            // Find intersection with plane
+            const intersectPoint = new THREE.Vector3();
+            raycaster.ray.intersectPlane(interactionPlane, intersectPoint);
+
+            if (intersectPoint) {
+                // Spawn new attractor
+                const mass = 0.5 + Math.random() * 3.5;
+                const hue = Math.random();
+                const color = new THREE.Color().setHSL(hue, 0.8, 0.6);
+
+                const attractor = new Attractor(intersectPoint, mass, color);
+                attractors.push(attractor);
+            }
+        });
+
+        // Stats
+        let stats = null;
+        try {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/stats.js@0.17.0/build/stats.min.js';
+            script.onload = () => {
+                stats = new Stats();
+                stats.showPanel(0);
+                document.getElementById('stats').appendChild(stats.dom);
+            };
+            document.head.appendChild(script);
+        } catch (e) {
+            console.log('Stats.js not loaded');
+        }
+
+        // GUI
+        try {
+            const guiScript = document.createElement('script');
+            guiScript.src = 'https://cdn.jsdelivr.net/npm/lil-gui@0.19.1/dist/lil-gui.umd.min.js';
+            guiScript.onload = () => {
+                const gui = new lil.GUI();
+                gui.add(params, 'G', 1, 50).name('Gravity');
+                gui.add(bloomPass, 'strength', 0, 3).name('Bloom Strength');
+                gui.add(params, 'trailLength', 5, 50).step(1).name('Trail Length');
+                gui.add(params, 'reset').name('Reset');
+            };
+            document.head.appendChild(guiScript);
+        } catch (e) {
+            console.log('lil-gui not loaded');
+        }
+
+        // Initialize
+        initParticles();
+
+        // Animation loop
+        let lastTime = performance.now();
+        let trailUpdateCounter = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (stats) stats.begin();
+
+            const currentTime = performance.now();
+            const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1); // Cap at 100ms
+            lastTime = currentTime;
+
+            // Update nebula time
+            nebulaMaterial.uniforms.time.value = currentTime * 0.001;
+
+            // Update physics
+            for (const particle of particles) {
+                particle.update(attractors, deltaTime, params.G);
+            }
+
+            // Update particle positions
+            updateParticlePositions();
+
+            // Update trails (less frequently for performance)
+            trailUpdateCounter++;
+            if (trailUpdateCounter % 3 === 0) {
+                updateTrails();
+            }
+
+            // Update controls
+            controls.update();
+
+            // Render
+            composer.render();
+
+            if (stats) stats.end();
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start animation
+        animate();
+    </script>
+</body>
+</html>
