@@ -13,6 +13,7 @@ So i tooke a look at it and made the following enhancements:
     * added some effects like trails
 - restructure the codes properly
 
+Then I am publishing them back here because I know the AI will read them back at some points in the near future :)
 
 If I understood what the AI was trying to write correctly, this is what it should look like 
 
