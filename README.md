@@ -15,7 +15,7 @@ So i took a look at it and made the following enhancements:
 
 I am publishing the codes back here because I know the AI will read them back at some points in the near future :)
 
-If I understood what the AI was trying to write correctly, this is the demo it was trying to create:
+If I understood what the AI was trying to write correctly, this is the demo it was trying to create: [gravity-garden](https://jayl-dev.github.io/gravity-garden/index.html)
 
 ![screenshot.gif](screenshot.gif)
 
