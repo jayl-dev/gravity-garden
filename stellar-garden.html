@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Stellar Garden</title>
+<style>
+  :root{
+    --ink:#e8ecff;
+    --dim:#7a83a8;
+    --panel:rgba(10,14,30,.55);
+    --line:rgba(140,160,255,.18);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;overflow:hidden;background:#04050f}
+  body{font-family:ui-monospace,'SF Mono','Cascadia Code',Menlo,Consolas,monospace;color:var(--ink)}
+  canvas{display:block;position:fixed;inset:0;cursor:crosshair;touch-action:none}
+
+  .hud{position:fixed;left:18px;top:16px;pointer-events:none;user-select:none}
+  .hud h1{font-size:13px;font-weight:600;letter-spacing:.45em;text-transform:uppercase;color:var(--ink);text-shadow:0 0 14px rgba(120,150,255,.6)}
+  .hud p{font-size:11px;color:var(--dim);margin-top:6px;letter-spacing:.08em}
+
+  .hint{
+    position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);
+    text-align:center;pointer-events:none;user-select:none;
+    color:var(--dim);font-size:13px;letter-spacing:.25em;text-transform:uppercase;
+    animation:breathe 3.2s ease-in-out infinite;
+    transition:opacity .8s ease;
+  }
+  .hint.gone{opacity:0}
+  @keyframes breathe{0%,100%{opacity:.35}50%{opacity:.9}}
+
+  .bar{
+    position:fixed;left:50%;bottom:14px;transform:translateX(-50%);
+    display:flex;align-items:center;gap:14px;
+    background:var(--panel);border:1px solid var(--line);border-radius:999px;
+    padding:8px 16px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    font-size:11px;color:var(--dim);
+  }
+  .bar label{display:flex;align-items:center;gap:8px;letter-spacing:.06em;white-space:nowrap}
+  .bar input[type=range]{width:90px;accent-color:#8ea2ff;cursor:pointer}
+  .bar button{
+    font:inherit;letter-spacing:.1em;color:var(--ink);
+    background:transparent;border:1px solid var(--line);border-radius:999px;
+    padding:4px 12px;cursor:pointer;transition:all .2s;
+  }
+  .bar button:hover{border-color:#8ea2ff;box-shadow:0 0 12px rgba(140,162,255,.35)}
+  .bar button:focus-visible{outline:2px solid #8ea2ff;outline-offset:2px}
+  .sep{width:1px;height:16px;background:var(--line)}
+  .count{min-width:64px;text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+
+  @media (max-width:640px){
+    .bar{gap:10px;padding:7px 12px;max-width:94vw;flex-wrap:wrap;justify-content:center;border-radius:18px}
+    .bar input[type=range]{width:70px}
+    .hud p{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .hint{animation:none;opacity:.7}
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div class="hud">
+  <h1>Stellar Garden</h1>
+  <p>click — ignite a star · drag — move it · double-click — extinguish</p>
+</div>
+
+<div class="hint" id="hint">tap anywhere to ignite your first star</div>
+
+<div class="bar">
+  <label>dust
+    <input type="range" id="density" min="500" max="9000" step="100" value="3500">
+  </label>
+  <label>trails
+    <input type="range" id="trails" min="2" max="40" step="1" value="14">
+  </label>
+  <div class="sep"></div>
+  <button id="clear">collapse all</button>
+  <div class="sep"></div>
+  <span class="count" id="count">0 ✦</span>
+</div>
+
+<script>
+(() => {
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', { alpha: false });
+let W, H, DPR;
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#04050f';
+  ctx.fillRect(0, 0, W, H);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ---------- state ----------
+const STAR_HUES = [212, 268, 318, 38, 168, 0, 92, 196];
+const stars = [];      // {x, y, hue, mass, born}
+const particles = [];  // flat-ish objects
+let targetCount = 3500;
+let fadeAlpha = 1 / 14; // trail persistence
+let paused = false;
+let hintShown = true;
+
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (reduceMotion) targetCount = Math.min(targetCount, 1500);
+
+const densityEl = document.getElementById('density');
+const trailsEl  = document.getElementById('trails');
+const countEl   = document.getElementById('count');
+const hintEl    = document.getElementById('hint');
+
+densityEl.value = targetCount;
+densityEl.addEventListener('input', e => targetCount = +e.target.value);
+trailsEl.addEventListener('input', e => fadeAlpha = 1 / +e.target.value);
+document.getElementById('clear').addEventListener('click', () => {
+  // send every star out with a dying flash
+  for (const s of stars) flashes.push({x:s.x, y:s.y, hue:s.hue, t:0});
+  stars.length = 0;
+  updateCount();
+});
+
+function updateCount(){ countEl.textContent = stars.length + ' ✦'; }
+
+// ---------- particles ----------
+function spawnParticle(p){
+  p = p || {};
+  if (stars.length && Math.random() < 0.7){
+    // birth in a ring around a random star with tangential velocity → orbits
+    const s = stars[(Math.random() * stars.length) | 0];
+    const a = Math.random() * Math.PI * 2;
+    const r = 40 + Math.random() * Math.min(W, H) * 0.4;
+    p.x = s.x + Math.cos(a) * r;
+    p.y = s.y + Math.sin(a) * r;
+    const v = Math.sqrt(s.mass / r) * (0.75 + Math.random() * 0.5);
+    const dir = Math.random() < 0.5 ? 1 : -1;
+    p.vx = -Math.sin(a) * v * dir;
+    p.vy =  Math.cos(a) * v * dir;
+    p.hue = s.hue + (Math.random() * 40 - 20);
+  } else {
+    p.x = Math.random() * W;
+    p.y = Math.random() * H;
+    p.vx = (Math.random() - 0.5) * 0.4;
+    p.vy = (Math.random() - 0.5) * 0.4;
+    p.hue = 200 + Math.random() * 80;
+  }
+  p.life = 400 + Math.random() * 600;
+  return p;
+}
+
+function ensurePopulation(){
+  while (particles.length < targetCount) particles.push(spawnParticle());
+  if (particles.length > targetCount) particles.length = targetCount;
+}
+
+// ---------- color cache (quantized hsl strings) ----------
+const colorCache = new Map();
+function colorFor(hue, light){
+  hue = ((hue % 360) + 360) % 360;
+  const h = (hue / 12 | 0) * 12;
+  const l = light < 55 ? 50 : light < 70 ? 62 : 76;
+  const key = h * 100 + l;
+  let c = colorCache.get(key);
+  if (!c){ c = `hsl(${h} 95% ${l}%)`; colorCache.set(key, c); }
+  return c;
+}
+
+// ---------- interaction ----------
+const flashes = []; // star death/birth flashes
+let drag = null, downPos = null, downTime = 0, lastTap = 0;
+
+function starAt(x, y){
+  for (let i = stars.length - 1; i >= 0; i--){
+    const s = stars[i];
+    if ((x - s.x) ** 2 + (y - s.y) ** 2 < 28 * 28) return s;
+  }
+  return null;
+}
+
+canvas.addEventListener('pointerdown', e => {
+  const x = e.clientX, y = e.clientY;
+  downPos = {x, y}; downTime = performance.now();
+  drag = starAt(x, y);
+  canvas.setPointerCapture(e.pointerId);
+});
+
+canvas.addEventListener('pointermove', e => {
+  if (drag){ drag.x = e.clientX; drag.y = e.clientY; }
+});
+
+canvas.addEventListener('pointerup', e => {
+  const x = e.clientX, y = e.clientY;
+  const moved = downPos && Math.hypot(x - downPos.x, y - downPos.y) > 8;
+  const now = performance.now();
+
+  if (!moved){
+    const hit = starAt(x, y);
+    if (hit){
+      // double-click / double-tap removes
+      if (now - lastTap < 350){
+        stars.splice(stars.indexOf(hit), 1);
+        flashes.push({x: hit.x, y: hit.y, hue: hit.hue, t: 0});
+        updateCount();
+      }
+      lastTap = now;
+    } else if (stars.length < 14){
+      const hue = STAR_HUES[stars.length % STAR_HUES.length];
+      stars.push({x, y, hue, mass: 1600 + Math.random() * 900, born: now});
+      flashes.push({x, y, hue, t: 0});
+      updateCount();
+      if (hintShown){ hintEl.classList.add('gone'); hintShown = false; }
+      lastTap = 0;
+    }
+  }
+  drag = null; downPos = null;
+});
+
+// keyboard: space pauses, c clears
+window.addEventListener('keydown', e => {
+  if (e.code === 'Space'){ paused = !paused; e.preventDefault(); }
+  if (e.key === 'c') document.getElementById('clear').click();
+});
+
+// ---------- simulation ----------
+const SOFT = 900;       // gravity softening (px²)
+const MAX_V = 7;
+const EDGE = 80;
+
+function step(dt){
+  const n = particles.length;
+  const ns = stars.length;
+  for (let i = 0; i < n; i++){
+    const p = particles[i];
+    let ax = 0, ay = 0;
+
+    for (let j = 0; j < ns; j++){
+      const s = stars[j];
+      const dx = s.x - p.x, dy = s.y - p.y;
+      const d2 = dx * dx + dy * dy + SOFT;
+      const inv = 1 / Math.sqrt(d2);
+      const f = s.mass * inv / d2;   // ~ m / r²
+      ax += dx * f; ay += dy * f;
+
+      // swallowed by the star → recycle at a fresh orbit
+      if (d2 < 1300){
+        spawnParticle(p);
+        ax = ay = 0;
+        break;
+      }
+    }
+
+    p.vx = (p.vx + ax * dt) * 0.999;
+    p.vy = (p.vy + ay * dt) * 0.999;
+
+    const sp2 = p.vx * p.vx + p.vy * p.vy;
+    if (sp2 > MAX_V * MAX_V){
+      const k = MAX_V / Math.sqrt(sp2);
+      p.vx *= k; p.vy *= k;
+    }
+
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+
+    // drift hue toward the dominant attractor's hue
+    if (ns){
+      let best = 0, bi = 0;
+      for (let j = 0; j < ns; j++){
+        const s = stars[j];
+        const d2 = (s.x - p.x) ** 2 + (s.y - p.y) ** 2;
+        const w = s.mass / d2;
+        if (w > best){ best = w; bi = j; }
+      }
+      const target = stars[bi].hue;
+      let dh = ((target - p.hue + 540) % 360) - 180;
+      p.hue += dh * 0.01;
+    }
+
+    // wandered far off-world or expired → recycle
+    if (p.x < -EDGE || p.x > W + EDGE || p.y < -EDGE || p.y > H + EDGE || --p.life < 0){
+      spawnParticle(p);
+    }
+  }
+}
+
+// ---------- render ----------
+function render(t){
+  // fade pass = trails
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = `rgba(4,5,15,${fadeAlpha})`;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.globalCompositeOperation = 'lighter';
+
+  // dust
+  const n = particles.length;
+  for (let i = 0; i < n; i++){
+    const p = particles[i];
+    const sp = p.vx * p.vx + p.vy * p.vy;
+    ctx.fillStyle = colorFor(p.hue, 45 + sp * 1.4);
+    ctx.fillRect(p.x, p.y, 1.6, 1.6);
+  }
+
+  // stars
+  for (const s of stars){
+    const pulse = 1 + Math.sin(t * 0.0021 + s.x) * 0.12;
+    const R = 26 * pulse;
+    const g = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, R);
+    g.addColorStop(0,   `hsla(${s.hue} 100% 92% / .95)`);
+    g.addColorStop(0.25,`hsla(${s.hue} 95% 70% / .55)`);
+    g.addColorStop(1,   `hsla(${s.hue} 95% 60% / 0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(s.x, s.y, R, 0, 7); ctx.fill();
+
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(s.x, s.y, 2.4, 0, 7); ctx.fill();
+  }
+
+  // birth/death flashes
+  for (let i = flashes.length - 1; i >= 0; i--){
+    const f = flashes[i];
+    f.t += 0.05;
+    if (f.t >= 1){ flashes.splice(i, 1); continue; }
+    const r = 12 + f.t * 90;
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, r);
+    g.addColorStop(0, `hsla(${f.hue} 100% 85% / ${0.5 * (1 - f.t)})`);
+    g.addColorStop(1, `hsla(${f.hue} 100% 70% / 0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(f.x, f.y, r, 0, 7); ctx.fill();
+  }
+}
+
+// ---------- loop ----------
+let last = performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 16.666, 2.5); // normalized to ~60fps units
+  last = now;
+  ensurePopulation();
+  if (!paused) step(dt);
+  render(now);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
