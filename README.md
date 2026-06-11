@@ -1,3 +1,9 @@
+*Update: I asked claude to read this codebase and write a short abstract descritpion of what it does: "an interactive cosmic playground where you click anywhere on the screen to place glowing stars, and thousands of tiny colored particles swirl and orbit around them just like planets and comets in space. The more stars you place, the more complex and beautiful the flowing patterns become — particles get pulled in different directions, spiral inward, slingshot around, and leave glowing trails behind them. It's part toy, part art — a living, breathing galaxy you create with your clicks." 
+
+- I then fed this to claude.ai on the web chat (so that it doesn't have access to the codes in this project) - this is what it created: https://jayl-dev.github.io/gravity-garden/stellar-garden.html 
+I didn't read thru what it wrote but I ran it and it looked and behave very much like the end result that I created - except that it wrote it from scratch in a few minutes, vs me spent a couple of hours just to fix the initial vide coded version :)
+----------------
+
 I was recently quite impressed with Claude's coding abilities, so I decided to test its limits.
 
 I gave the AI a simple, open-ended prompt: "Write something interesting and demo it to me." After processing for a moment, it apparently decided that "interesting" + "demo" = javaScript particle simulation. It then spent a bit more time "thinking" and eventually generated this slop [vibe-coded.html](https://jayl-dev.github.io/gravity-garden/vibe-coded.html)
