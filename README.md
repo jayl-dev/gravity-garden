@@ -1,6 +1,6 @@
 *Update: I asked claude to read this codebase and write a short abstract descritpion of what it does: "an interactive cosmic playground where you click anywhere on the screen to place glowing stars, and thousands of tiny colored particles swirl and orbit around them just like planets and comets in space. The more stars you place, the more complex and beautiful the flowing patterns become — particles get pulled in different directions, spiral inward, slingshot around, and leave glowing trails behind them. It's part toy, part art — a living, breathing galaxy you create with your clicks." 
 
-- I then fed this to claude.ai on the web chat (so that it doesn't have access to the codes in this project) - this is what it created: [stellar-garden.html](https://jayl-dev.github.io/gravity-garden/stellar-garden.html)
+- I then fed this to claude.ai Fable 5 model on the web chat (so that it doesn't have access to the codes in this project) - this is what it created: [stellar-garden.html](https://jayl-dev.github.io/gravity-garden/stellar-garden.html)
 I didn't read thru what it wrote but I ran it and it looked and behave very much like the end result that I created - except that it wrote it from scratch in a few minutes, vs me spent a couple of hours just to fix the initial vibe coded version :)
 ----------------
 
