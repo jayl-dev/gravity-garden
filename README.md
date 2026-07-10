@@ -5,6 +5,7 @@ I didn't read thru what it wrote but I ran it and it looked and behave very much
 ----------------
 
 *Update #2: I gave the same prompt in chatgpt.com with the new gpt 5.6 sol model - here's what it created - Personally I preferred this one over the Fable 5 version. [cosmic_playground.html](https://jayl-dev.github.io/gravity-garden/cosmic_playground.html)
+
 ----------------
 
 I was recently quite impressed with Claude's coding abilities, so I decided to test its limits.
