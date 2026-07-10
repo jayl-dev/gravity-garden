@@ -4,6 +4,9 @@
 I didn't read thru what it wrote but I ran it and it looked and behave very much like the end result that I created - except that it wrote it from scratch in a few minutes, vs me spent a couple of hours just to fix the initial vibe coded version :)
 ----------------
 
+*Update #2: I gave the same prompt in chatgpt.com with the new gpt 5.6 sol model - here's what it created - Personally I preferred this one over the Fable 5 version. [cosmic_playground.html](https://jayl-dev.github.io/gravity-garden/cosmic_playground.html)
+----------------
+
 I was recently quite impressed with Claude's coding abilities, so I decided to test its limits.
 
 I gave the AI a simple, open-ended prompt: "Write something interesting and demo it to me." After processing for a moment, it apparently decided that "interesting" + "demo" = javaScript particle simulation. It then spent a bit more time "thinking" and eventually generated this slop [vibe-coded.html](https://jayl-dev.github.io/gravity-garden/vibe-coded.html)
