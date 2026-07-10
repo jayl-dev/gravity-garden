@@ -4,7 +4,8 @@
 I didn't read thru what it wrote but I ran it and it looked and behave very much like the end result that I created - except that it wrote it from scratch in a few minutes, vs me spent a couple of hours just to fix the initial vibe coded version :)
 ----------------
 
-*Update #2: I gave the same prompt in chatgpt.com with the new gpt 5.6 sol model - here's what it created - Personally I preferred this one over the Fable 5 version. [cosmic_playground.html](https://jayl-dev.github.io/gravity-garden/cosmic_playground.html)
+*Update #2: I gave the same prompt in chatgpt.com with the new gpt 5.6 sol model - here's what it created - [cosmic_playground.html](https://jayl-dev.github.io/gravity-garden/cosmic_playground.html)
+The physics simulation looks a bit weird with this initial version so I asked it to just fix it: "the physics seem to be wrong? please double check" - Here's the version after the fix [cosmic_playground(1).html](https://jayl-dev.github.io/gravity-garden/cosmic_playground(1).html) . Personally I preferred this one over the Fable 5 version, althought it took 2 prompts. 
 
 ----------------
 
