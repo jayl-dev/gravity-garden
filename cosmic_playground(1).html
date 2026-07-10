@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#02040d" />
+  <title>Cosmic Playground</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --glass: rgba(8, 12, 29, 0.58);
+      --glass-border: rgba(164, 190, 255, 0.18);
+      --text: #eef3ff;
+      --muted: #9ba8c8;
+      --accent: #9d8cff;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #02040d;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 18% 20%, rgba(82, 42, 146, 0.18), transparent 28%),
+        radial-gradient(circle at 84% 15%, rgba(26, 92, 155, 0.14), transparent 32%),
+        radial-gradient(circle at 60% 82%, rgba(139, 32, 108, 0.12), transparent 34%);
+      mix-blend-mode: screen;
+      z-index: 1;
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: crosshair;
+    }
+
+    .ui {
+      position: fixed;
+      inset: 0;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .brand {
+      position: absolute;
+      top: max(20px, env(safe-area-inset-top));
+      left: max(22px, env(safe-area-inset-left));
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      pointer-events: none;
+      text-shadow: 0 2px 24px rgba(0, 0, 0, 0.6);
+    }
+
+    .brand-mark {
+      width: 35px;
+      height: 35px;
+      border-radius: 50%;
+      background:
+        radial-gradient(circle at 38% 35%, #ffffff 0 7%, #d3e6ff 8% 13%, transparent 14%),
+        radial-gradient(circle at center, rgba(142, 124, 255, 0.95), rgba(72, 75, 194, 0.45) 45%, transparent 72%);
+      box-shadow: 0 0 24px rgba(145, 129, 255, 0.65), inset 0 0 14px rgba(255,255,255,.28);
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: clamp(18px, 2vw, 25px);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      font-weight: 720;
+    }
+
+    .brand p {
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: .04em;
+    }
+
+    .panel {
+      position: absolute;
+      top: max(18px, env(safe-area-inset-top));
+      right: max(18px, env(safe-area-inset-right));
+      width: min(294px, calc(100vw - 36px));
+      padding: 14px;
+      border: 1px solid var(--glass-border);
+      border-radius: 18px;
+      background: var(--glass);
+      box-shadow: 0 16px 60px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+      backdrop-filter: blur(18px) saturate(130%);
+      -webkit-backdrop-filter: blur(18px) saturate(130%);
+      pointer-events: auto;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 13px;
+    }
+
+    .stat {
+      padding: 9px 8px;
+      border-radius: 12px;
+      background: rgba(255,255,255,.035);
+      border: 1px solid rgba(255,255,255,.06);
+      text-align: center;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 16px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .stat span {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: .11em;
+    }
+
+    .control {
+      margin: 11px 2px;
+    }
+
+    .control-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 7px;
+      font-size: 12px;
+    }
+
+    .control-head span:last-child {
+      color: var(--muted);
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 4px;
+      margin: 0;
+      border-radius: 99px;
+      appearance: none;
+      -webkit-appearance: none;
+      background: rgba(255,255,255,.13);
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      width: 15px;
+      height: 15px;
+      appearance: none;
+      -webkit-appearance: none;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.85);
+      background: var(--accent);
+      box-shadow: 0 0 14px rgba(157,140,255,.85);
+      cursor: pointer;
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,.85);
+      background: var(--accent);
+      box-shadow: 0 0 14px rgba(157,140,255,.85);
+      cursor: pointer;
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    button {
+      min-height: 38px;
+      padding: 0 12px;
+      border-radius: 11px;
+      border: 1px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.055);
+      color: var(--text);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 650;
+      letter-spacing: .02em;
+      cursor: pointer;
+      transition: transform .16s ease, background .16s ease, border-color .16s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      background: rgba(255,255,255,.1);
+      border-color: rgba(255,255,255,.18);
+    }
+
+    button:active { transform: translateY(0) scale(.98); }
+
+    button.primary {
+      background: linear-gradient(135deg, rgba(126,104,255,.42), rgba(73,132,255,.24));
+      border-color: rgba(171,161,255,.28);
+    }
+
+    .hint {
+      position: absolute;
+      left: 50%;
+      bottom: max(30px, calc(env(safe-area-inset-bottom) + 18px));
+      transform: translateX(-50%);
+      max-width: min(540px, calc(100vw - 32px));
+      padding: 12px 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.1);
+      background: rgba(5, 8, 19, .54);
+      box-shadow: 0 10px 44px rgba(0,0,0,.32);
+      backdrop-filter: blur(14px);
+      color: #d6def7;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.4;
+      letter-spacing: .02em;
+      opacity: 1;
+      transition: opacity .9s ease, transform .9s ease;
+      pointer-events: none;
+    }
+
+    .hint.hide {
+      opacity: 0;
+      transform: translate(-50%, 12px);
+    }
+
+    .toast {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) scale(.96);
+      padding: 10px 15px;
+      border-radius: 999px;
+      background: rgba(8, 12, 28, .72);
+      border: 1px solid rgba(255,255,255,.12);
+      backdrop-filter: blur(14px);
+      color: #e7ecff;
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity .22s ease, transform .22s ease;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+
+    @media (max-width: 720px) {
+      .brand p { display: none; }
+      .panel {
+        top: auto;
+        bottom: max(78px, calc(env(safe-area-inset-bottom) + 70px));
+        right: 12px;
+        width: 220px;
+        padding: 11px;
+      }
+      .stats { margin-bottom: 8px; }
+      .control { margin: 8px 2px; }
+      .buttons { margin-top: 10px; }
+      .hint { bottom: max(16px, calc(env(safe-area-inset-bottom) + 10px)); font-size: 12px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="space" aria-label="Interactive cosmic particle playground"></canvas>
+
+  <div class="ui">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div>
+        <h1>Cosmic Playground</h1>
+        <p>Build a living galaxy, one star at a time.</p>
+      </div>
+    </div>
+
+    <section class="panel" aria-label="Cosmic controls">
+      <div class="stats">
+        <div class="stat"><strong id="starCount">0</strong><span>Stars</span></div>
+        <div class="stat"><strong id="particleCount">6,000</strong><span>Particles</span></div>
+        <div class="stat"><strong id="fps">60</strong><span>FPS</span></div>
+      </div>
+
+      <div class="control">
+        <div class="control-head"><span>Particles</span><span id="particleValue">6,000</span></div>
+        <input id="particles" type="range" min="2000" max="12000" step="500" value="6000" />
+      </div>
+
+      <div class="control">
+        <div class="control-head"><span>Gravity</span><span id="gravityValue">1.00×</span></div>
+        <input id="gravity" type="range" min="35" max="180" step="1" value="100" />
+      </div>
+
+      <div class="control">
+        <div class="control-head"><span>Trail length</span><span id="trailValue">Long</span></div>
+        <input id="trail" type="range" min="1" max="18" step="1" value="6" />
+      </div>
+
+      <div class="buttons">
+        <button id="pause" class="primary">Pause</button>
+        <button id="clear">Clear stars</button>
+        <button id="randomize">Seed galaxy</button>
+        <button id="fullscreen">Fullscreen</button>
+      </div>
+    </section>
+
+    <div id="hint" class="hint">Click or tap anywhere to place a star · Right-click a star to remove it</div>
+    <div id="toast" class="toast" role="status"></div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      const canvas = document.getElementById('space');
+      const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
+
+      const ui = {
+        starCount: document.getElementById('starCount'),
+        particleCount: document.getElementById('particleCount'),
+        fps: document.getElementById('fps'),
+        particles: document.getElementById('particles'),
+        particleValue: document.getElementById('particleValue'),
+        gravity: document.getElementById('gravity'),
+        gravityValue: document.getElementById('gravityValue'),
+        trail: document.getElementById('trail'),
+        trailValue: document.getElementById('trailValue'),
+        pause: document.getElementById('pause'),
+        clear: document.getElementById('clear'),
+        randomize: document.getElementById('randomize'),
+        fullscreen: document.getElementById('fullscreen'),
+        hint: document.getElementById('hint'),
+        toast: document.getElementById('toast')
+      };
+
+      const palette = [
+        '#6fe7ff', '#8aa7ff', '#b28cff', '#ff8ad8',
+        '#ff9d7c', '#ffd36e', '#93ffbd', '#d8f2ff'
+      ];
+
+      const MAX_STARS = 24;
+      const MAX_PARTICLES = 12000;
+      // Simulation units are CSS pixels and seconds. Stars are fixed attractors;
+      // particles follow softened Newtonian gravity around them.
+      const BASE_MU = 70000;
+      const SOFTENING_SQ = 144; // 12 px Plummer softening avoids singular acceleration.
+      const FIXED_DT = 1 / 60;
+      const MAX_FRAME_DT = 0.05;
+      const MAX_SPEED = 420;
+      const WORLD_MARGIN = 90;
+
+      let width = 0;
+      let height = 0;
+      let dpr = 1;
+      let particleTotal = Number(ui.particles.value);
+      let gravityScale = Number(ui.gravity.value) / 100;
+      let fadeAlpha = Number(ui.trail.value) / 100;
+      let running = true;
+      let firstStarPlaced = false;
+      let lastTime = performance.now();
+      let fpsAccumulator = 0;
+      let fpsFrames = 0;
+      let fpsValue = 60;
+      let toastTimer = 0;
+      let physicsAccumulator = 0;
+
+      const pointer = { x: -1000, y: -1000, active: false };
+      const stars = [];
+
+      const px = new Float32Array(MAX_PARTICLES);
+      const py = new Float32Array(MAX_PARTICLES);
+      const prevX = new Float32Array(MAX_PARTICLES);
+      const prevY = new Float32Array(MAX_PARTICLES);
+      const vx = new Float32Array(MAX_PARTICLES);
+      const vy = new Float32Array(MAX_PARTICLES);
+      const colorIndex = new Uint8Array(MAX_PARTICLES);
+      const brightness = new Float32Array(MAX_PARTICLES);
+
+      const random = (min, max) => min + Math.random() * (max - min);
+
+      function showToast(message) {
+        ui.toast.textContent = message;
+        ui.toast.classList.add('show');
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => ui.toast.classList.remove('show'), 900);
+      }
+
+      function resize() {
+        const oldWidth = width || window.innerWidth;
+        const oldHeight = height || window.innerHeight;
+
+        width = window.innerWidth;
+        height = window.innerHeight;
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+        const sx = width / oldWidth;
+        const sy = height / oldHeight;
+        for (const star of stars) {
+          star.x *= sx;
+          star.y *= sy;
+        }
+        for (let i = 0; i < particleTotal; i++) {
+          px[i] *= sx;
+          py[i] *= sy;
+          prevX[i] = px[i];
+          prevY[i] = py[i];
+        }
+
+        paintBackground(true);
+      }
+
+      function paintBackground(opaque = false) {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = opaque ? '#02040d' : `rgba(2, 4, 13, ${fadeAlpha})`;
+        ctx.fillRect(0, 0, width, height);
+      }
+
+      function resetParticle(i, nearStar = null) {
+        if (nearStar) {
+          const angle = Math.random() * Math.PI * 2;
+          const maxRadius = Math.max(54, Math.min(width, height) * 0.22);
+          const radius = random(30, maxRadius);
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+
+          px[i] = nearStar.x + cos * radius;
+          py[i] = nearStar.y + sin * radius;
+
+          // Circular speed is derived from the same softened gravity used below:
+          // v² / r = mu*r / (r² + epsilon²)^(3/2).
+          const mu = BASE_MU * gravityScale * nearStar.mass;
+          const softened = radius * radius + SOFTENING_SQ;
+          const circularSpeed = Math.sqrt(
+            Math.max(0, mu * radius * radius / Math.pow(softened, 1.5))
+          );
+          const direction = Math.random() < 0.5 ? -1 : 1;
+          const tangentialSpeed = circularSpeed * random(0.82, 1.12) * direction;
+          const radialSpeed = random(-4, 4);
+
+          vx[i] = -sin * tangentialSpeed + cos * radialSpeed;
+          vy[i] = cos * tangentialSpeed + sin * radialSpeed;
+        } else {
+          px[i] = Math.random() * width;
+          py[i] = Math.random() * height;
+          vx[i] = random(-10, 10);
+          vy[i] = random(-10, 10);
+        }
+
+        prevX[i] = px[i];
+        prevY[i] = py[i];
+        colorIndex[i] = Math.floor(Math.random() * palette.length);
+        brightness[i] = random(0.45, 1);
+      }
+
+      function initializeParticles(start = 0, end = particleTotal) {
+        for (let i = start; i < end; i++) {
+          const source = stars.length ? stars[Math.floor(Math.random() * stars.length)] : null;
+          resetParticle(i, source);
+        }
+      }
+
+      function addStar(x, y, quiet = false) {
+        if (stars.length >= MAX_STARS) {
+          showToast(`Maximum of ${MAX_STARS} stars reached`);
+          return;
+        }
+
+        const hue = Math.floor(random(185, 330));
+        stars.push({
+          x,
+          y,
+          mass: random(0.82, 1.25),
+          radius: random(3.1, 5.1),
+          hue,
+          pulse: Math.random() * Math.PI * 2,
+          spin: Math.random() < 0.5 ? -1 : 1
+        });
+
+        const star = stars[stars.length - 1];
+        const burst = Math.min(900, Math.floor(particleTotal * 0.14));
+        for (let n = 0; n < burst; n++) {
+          const i = Math.floor(Math.random() * particleTotal);
+          resetParticle(i, star);
+        }
+
+        if (!firstStarPlaced) {
+          firstStarPlaced = true;
+          ui.hint.classList.add('hide');
+        }
+
+        updateStats();
+        if (!quiet) showToast('Star born');
+      }
+
+      function removeNearestStar(x, y) {
+        if (!stars.length) return;
+        let nearest = -1;
+        let nearestDistance = Infinity;
+
+        for (let i = 0; i < stars.length; i++) {
+          const dx = stars[i].x - x;
+          const dy = stars[i].y - y;
+          const distance = dx * dx + dy * dy;
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearest = i;
+          }
+        }
+
+        if (nearest >= 0 && nearestDistance < 3600) {
+          stars.splice(nearest, 1);
+          updateStats();
+          showToast('Star removed');
+        }
+      }
+
+      function seedGalaxy() {
+        const count = Math.min(5, MAX_STARS - stars.length);
+        for (let i = 0; i < count; i++) {
+          const angle = (i / Math.max(1, count)) * Math.PI * 2 + random(-0.4, 0.4);
+          const radius = random(Math.min(width, height) * 0.1, Math.min(width, height) * 0.29);
+          addStar(
+            width * 0.5 + Math.cos(angle) * radius,
+            height * 0.5 + Math.sin(angle) * radius,
+            true
+          );
+        }
+        showToast('Galaxy seeded');
+      }
+
+      function clearStars() {
+        stars.length = 0;
+        initializeParticles();
+        paintBackground(true);
+        updateStats();
+        ui.hint.classList.remove('hide');
+        firstStarPlaced = false;
+        showToast('Space cleared');
+      }
+
+      function updateStats() {
+        ui.starCount.textContent = stars.length.toLocaleString();
+        ui.particleCount.textContent = particleTotal.toLocaleString();
+        ui.particleValue.textContent = particleTotal.toLocaleString();
+      }
+
+      function physicsStep(stepSeconds) {
+        const starCount = stars.length;
+        const muScale = BASE_MU * gravityScale;
+        const maxSpeedSq = MAX_SPEED * MAX_SPEED;
+
+        for (let i = 0; i < particleTotal; i++) {
+          let ax = 0;
+          let ay = 0;
+
+          for (let s = 0; s < starCount; s++) {
+            const star = stars[s];
+            const dx = star.x - px[i];
+            const dy = star.y - py[i];
+            const softenedDistanceSq = dx * dx + dy * dy + SOFTENING_SQ;
+            const invDistance = 1 / Math.sqrt(softenedDistanceSq);
+            const invDistanceCubed = invDistance * invDistance * invDistance;
+            const accelerationScale = muScale * star.mass * invDistanceCubed;
+
+            ax += dx * accelerationScale;
+            ay += dy * accelerationScale;
+          }
+
+          // Semi-implicit (symplectic) Euler is stable for orbital motion and
+          // does not introduce the artificial inward spiral caused by drag.
+          vx[i] += ax * stepSeconds;
+          vy[i] += ay * stepSeconds;
+
+          // Numerical guard for pathological close passes through many stars.
+          const speedSq = vx[i] * vx[i] + vy[i] * vy[i];
+          if (speedSq > maxSpeedSq) {
+            const scale = MAX_SPEED / Math.sqrt(speedSq);
+            vx[i] *= scale;
+            vy[i] *= scale;
+          }
+
+          px[i] += vx[i] * stepSeconds;
+          py[i] += vy[i] * stepSeconds;
+
+          if (px[i] < -WORLD_MARGIN) {
+            px[i] = width + WORLD_MARGIN;
+            prevX[i] = px[i];
+          } else if (px[i] > width + WORLD_MARGIN) {
+            px[i] = -WORLD_MARGIN;
+            prevX[i] = px[i];
+          }
+
+          if (py[i] < -WORLD_MARGIN) {
+            py[i] = height + WORLD_MARGIN;
+            prevY[i] = py[i];
+          } else if (py[i] > height + WORLD_MARGIN) {
+            py[i] = -WORLD_MARGIN;
+            prevY[i] = py[i];
+          }
+        }
+      }
+
+      function updatePhysics(frameMilliseconds) {
+        for (let i = 0; i < particleTotal; i++) {
+          prevX[i] = px[i];
+          prevY[i] = py[i];
+        }
+
+        physicsAccumulator += Math.min(frameMilliseconds / 1000, MAX_FRAME_DT);
+        let steps = 0;
+        while (physicsAccumulator >= FIXED_DT && steps < 3) {
+          physicsStep(FIXED_DT);
+          physicsAccumulator -= FIXED_DT;
+          steps++;
+        }
+
+        // Ignore excess time after a long tab stall instead of applying one
+        // enormous, unstable integration step.
+        if (steps === 3 && physicsAccumulator >= FIXED_DT) {
+          physicsAccumulator = 0;
+        }
+      }
+
+      function drawParticles() {
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+
+        const paths = Array.from({ length: palette.length }, () => new Path2D());
+        for (let i = 0; i < particleTotal; i++) {
+          const path = paths[colorIndex[i]];
+          path.moveTo(prevX[i], prevY[i]);
+          path.lineTo(px[i], py[i]);
+        }
+
+        for (let i = 0; i < paths.length; i++) {
+          ctx.strokeStyle = palette[i];
+          ctx.globalAlpha = 0.56;
+          ctx.lineWidth = 0.72;
+          ctx.stroke(paths[i]);
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      function drawStars(time) {
+        ctx.globalCompositeOperation = 'lighter';
+
+        for (const star of stars) {
+          const pulse = 1 + Math.sin(time * 0.0022 + star.pulse) * 0.14;
+          const glowRadius = 31 * star.mass * pulse;
+          const gradient = ctx.createRadialGradient(star.x, star.y, 0, star.x, star.y, glowRadius);
+          gradient.addColorStop(0, 'rgba(255,255,255,1)');
+          gradient.addColorStop(0.08, `hsla(${star.hue}, 100%, 90%, .98)`);
+          gradient.addColorStop(0.25, `hsla(${star.hue}, 100%, 67%, .48)`);
+          gradient.addColorStop(1, `hsla(${star.hue}, 100%, 50%, 0)`);
+
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(star.x, star.y, glowRadius, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#fff';
+          ctx.beginPath();
+          ctx.arc(star.x, star.y, star.radius * pulse, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = `hsla(${star.hue}, 100%, 86%, .38)`;
+          ctx.lineWidth = 0.75;
+          ctx.beginPath();
+          ctx.moveTo(star.x - glowRadius * 0.52, star.y);
+          ctx.lineTo(star.x + glowRadius * 0.52, star.y);
+          ctx.moveTo(star.x, star.y - glowRadius * 0.52);
+          ctx.lineTo(star.x, star.y + glowRadius * 0.52);
+          ctx.stroke();
+        }
+
+        if (pointer.active) {
+          const ghost = ctx.createRadialGradient(pointer.x, pointer.y, 0, pointer.x, pointer.y, 18);
+          ghost.addColorStop(0, 'rgba(255,255,255,.7)');
+          ghost.addColorStop(0.2, 'rgba(157,140,255,.22)');
+          ghost.addColorStop(1, 'rgba(157,140,255,0)');
+          ctx.fillStyle = ghost;
+          ctx.beginPath();
+          ctx.arc(pointer.x, pointer.y, 18, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.globalCompositeOperation = 'source-over';
+      }
+
+      function frame(time) {
+        const dt = time - lastTime;
+        lastTime = time;
+
+        if (running) {
+          paintBackground(false);
+          updatePhysics(dt);
+          drawParticles();
+          drawStars(time);
+        }
+
+        fpsAccumulator += dt;
+        fpsFrames++;
+        if (fpsAccumulator >= 500) {
+          fpsValue = Math.round((fpsFrames * 1000) / fpsAccumulator);
+          ui.fps.textContent = String(fpsValue);
+          fpsAccumulator = 0;
+          fpsFrames = 0;
+        }
+
+        requestAnimationFrame(frame);
+      }
+
+      canvas.addEventListener('pointermove', (event) => {
+        pointer.x = event.clientX;
+        pointer.y = event.clientY;
+        pointer.active = true;
+      });
+
+      canvas.addEventListener('pointerleave', () => {
+        pointer.active = false;
+      });
+
+      canvas.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+        addStar(event.clientX, event.clientY);
+      });
+
+      canvas.addEventListener('contextmenu', (event) => {
+        event.preventDefault();
+        removeNearestStar(event.clientX, event.clientY);
+      });
+
+      ui.particles.addEventListener('input', () => {
+        const next = Number(ui.particles.value);
+        if (next > particleTotal) initializeParticles(particleTotal, next);
+        particleTotal = next;
+        updateStats();
+      });
+
+      ui.gravity.addEventListener('input', () => {
+        gravityScale = Number(ui.gravity.value) / 100;
+        ui.gravityValue.textContent = `${gravityScale.toFixed(2)}×`;
+      });
+
+      ui.trail.addEventListener('input', () => {
+        fadeAlpha = Number(ui.trail.value) / 100;
+        const value = Number(ui.trail.value);
+        ui.trailValue.textContent = value <= 4 ? 'Very long' : value <= 8 ? 'Long' : value <= 13 ? 'Medium' : 'Short';
+      });
+
+      ui.pause.addEventListener('click', () => {
+        running = !running;
+        ui.pause.textContent = running ? 'Pause' : 'Resume';
+        if (running) {
+          lastTime = performance.now();
+          physicsAccumulator = 0;
+        }
+      });
+
+      ui.clear.addEventListener('click', clearStars);
+      ui.randomize.addEventListener('click', seedGalaxy);
+
+      ui.fullscreen.addEventListener('click', async () => {
+        try {
+          if (!document.fullscreenElement) {
+            await document.documentElement.requestFullscreen();
+          } else {
+            await document.exitFullscreen();
+          }
+        } catch {
+          showToast('Fullscreen is unavailable');
+        }
+      });
+
+      window.addEventListener('keydown', (event) => {
+        if (event.code === 'Space') {
+          event.preventDefault();
+          ui.pause.click();
+        } else if (event.key.toLowerCase() === 'c') {
+          clearStars();
+        } else if (event.key.toLowerCase() === 'r') {
+          seedGalaxy();
+        }
+      });
+
+      window.addEventListener('resize', resize, { passive: true });
+
+      resize();
+      initializeParticles();
+      updateStats();
+      requestAnimationFrame(frame);
+    })();
+  </script>
+</body>
+</html>
