@@ -9,6 +9,10 @@ The physics simulation looks a bit weird with this initial version so I asked it
 
 ----------------
 
+*Update #3: I gave the same prompt to the latest open weight model - Kimi K3 - it created one that's pretty awesome - I preferred it over what Fable 5 and Gpt 5.6 created - it even gave me a publish button to quickly publish it :D - [Kimi k3 awesome galaxy](https://62vxvioiu6azk.kimi.page)
+
+----------------
+
 I was recently quite impressed with Claude's coding abilities, so I decided to test its limits.
 
 I gave the AI a simple, open-ended prompt: "Write something interesting and demo it to me." After processing for a moment, it apparently decided that "interesting" + "demo" = javaScript particle simulation. It then spent a bit more time "thinking" and eventually generated this slop [vibe-coded.html](https://jayl-dev.github.io/gravity-garden/vibe-coded.html)
