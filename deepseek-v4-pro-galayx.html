@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Cosmic Playground</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #03050f; }
+  body {
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  #c { display: block; position: fixed; inset: 0; cursor: crosshair; touch-action: none; }
+  .ui { position: fixed; z-index: 10; pointer-events: none; }
+  #title {
+    left: 24px; top: 20px;
+    color: rgba(240, 244, 255, 0.82);
+    font-size: 14px; letter-spacing: 0.38em; text-transform: uppercase;
+    text-shadow: 0 0 16px rgba(160, 190, 255, 0.6);
+  }
+  #hint {
+    left: 50%; top: 24%;
+    transform: translate(-50%, 0);
+    text-align: center;
+    color: rgba(222, 227, 255, 0.92);
+    font-size: clamp(15px, 2.2vw, 21px);
+    letter-spacing: 0.06em;
+    text-shadow: 0 0 18px rgba(140, 180, 255, 0.85);
+    transition: opacity 1.4s ease;
+  }
+  #hint small {
+    display: block; margin-top: 9px;
+    font-size: 0.7em; letter-spacing: 0.14em;
+    color: rgba(172, 182, 224, 0.72);
+  }
+  #count {
+    right: 24px; bottom: 20px;
+    color: rgba(172, 187, 226, 0.66);
+    font-size: 12px; letter-spacing: 0.12em;
+    font-variant-numeric: tabular-nums;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div class="ui" id="title">Cosmic Playground</div>
+<div class="ui" id="hint">
+  Click anywhere to birth a star
+  <small>stars pull particles into orbit &middot; press C to clear</small>
+</div>
+<div class="ui" id="count"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
+  const countEl = document.getElementById('count');
+  const hintEl = document.getElementById('hint');
+
+  let W = 0, H = 0, dpr = 1;
+  let time = 0;
+
+  /* ---------------------------------- palettes & sprites ---------------------------------- */
+
+  const PARTICLE_PALETTE = [
+    [120, 220, 255], [110, 130, 255], [170, 120, 255], [255, 120, 200],
+    [255, 95, 125],  [255, 185, 95],  [255, 225, 130], [140, 255, 180],
+    [90, 240, 225],  [255, 140, 225], [185, 165, 255], [125, 255, 255]
+  ];
+
+  const STAR_PALETTE = [
+    [255, 238, 185], [255, 212, 150], [255, 195, 215], [205, 232, 255],
+    [240, 240, 255], [255, 228, 205]
+  ];
+
+  function glowSprite(r, g, b, core) {
+    const size = 64, cv = document.createElement('canvas');
+    cv.width = cv.height = size;
+    const x = cv.getContext('2d');
+    const grd = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, core || 'rgba(255,255,255,1)');
+    grd.addColorStop(0.10, 'rgba(' + r + ',' + g + ',' + b + ',0.92)');
+    grd.addColorStop(0.32, 'rgba(' + r + ',' + g + ',' + b + ',0.32)');
+    grd.addColorStop(1, 'rgba(' + r + ',' + g + ',' + b + ',0)');
+    x.fillStyle = grd;
+    x.fillRect(0, 0, size, size);
+    return cv;
+  }
+
+  function nebulaSprite(r, g, b) {
+    const size = 512, cv = document.createElement('canvas');
+    cv.width = cv.height = size;
+    const x = cv.getContext('2d');
+    const grd = x.createRadialGradient(256, 256, 0, 256, 256, 256);
+    grd.addColorStop(0, 'rgba(' + r + ',' + g + ',' + b + ',0.55)');
+    grd.addColorStop(0.5, 'rgba(' + r + ',' + g + ',' + b + ',0.16)');
+    grd.addColorStop(1, 'rgba(' + r + ',' + g + ',' + b + ',0)');
+    x.fillStyle = grd;
+    x.fillRect(0, 0, size, size);
+    return cv;
+  }
+
+  const particleSprites = PARTICLE_PALETTE.map(function (c) { return glowSprite(c[0], c[1], c[2]); });
+  const starSprites = STAR_PALETTE.map(function (c) { return glowSprite(c[0], c[1], c[2], 'rgba(255,255,255,0.95)'); });
+  const nebulaA = nebulaSprite(72, 52, 142);
+  const nebulaB = nebulaSprite(22, 72, 122);
+
+  /* ---------------------------------- static background field ---------------------------------- */
+
+  const bgStars = [];
+  for (let i = 0; i < 200; i++) {
+    bgStars.push({
+      x: Math.random(),
+      y: Math.random(),
+      r: 0.4 + Math.random() * 1.1,
+      ph: Math.random() * Math.PI * 2,
+      sp: 0.5 + Math.random() * 2,
+      c: 150 + Math.random() * 105
+    });
+  }
+
+  /* ---------------------------------- world state ---------------------------------- */
+
+  const stars = [];
+  const particles = [];
+  const shocks = [];
+
+  const STEP = 1 / 60;         // fixed physics timestep (seconds)
+  const DRAG = 0.999;          // velocity retained per substep -> gentle spiral-in
+  const MAX_SPEED = 720;       // px/s (stability cap for slingshots)
+  const SOFT = 6;              // gravity softening, px
+  const MAX_PARTICLES = 3200;
+  let perfScale = 1;
+
+  function makeParticle(x, y, vx, vy, big) {
+    return {
+      x: x, y: y, vx: vx, vy: vy,
+      si: (Math.random() * particleSprites.length) | 0,
+      size: big ? (16 + Math.random() * 12) : (9 + Math.random() * 9)
+    };
+  }
+
+  function addStar(x, y) {
+    const ci = (Math.random() * STAR_PALETTE.length) | 0;
+    const radius = 11 + Math.random() * 8;          // 11..19
+    const strength = radius * 26000;                // gravity well strength
+    stars.push({
+      x: x, y: y, radius: radius, strength: strength, ci: ci,
+      phase: Math.random() * Math.PI * 2,
+      tw: 0.6 + Math.random() * 0.8,
+      pulse: 1.0
+    });
+
+    // creation burst — a shower of newborn particles
+    for (let i = 0; i < 46; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 20 + Math.random() * 300;   // px/s
+      particles.push(makeParticle(
+        x + Math.cos(a) * radius * 1.6,
+        y + Math.sin(a) * radius * 1.6,
+        Math.cos(a) * sp, Math.sin(a) * sp,
+        Math.random() < 0.2
+      ));
+    }
+    shocks.push({ x: x, y: y, r: 6, maxR: 120 + Math.random() * 70, a: 0.9 });
+  }
+
+  function emitFromStar(s) {
+    const a = Math.random() * Math.PI * 2;
+    const r = s.radius * (2 + Math.random() * 3.5);
+    const x = s.x + Math.cos(a) * r;
+    const y = s.y + Math.sin(a) * r;
+
+    const circ = Math.sqrt(s.strength / r);          // circular orbit speed
+    let speed = circ * (0.72 + Math.random() * 0.9); // 0.72..1.62 x circular -> bound + escaping
+    const dir = a + Math.PI / 2 * (Math.random() < 0.5 ? 1 : -1);
+    let vx = Math.cos(dir) * speed;
+    let vy = Math.sin(dir) * speed;
+
+    // small radial kick so some spiral in, some slingshot out
+    const rad = (Math.random() - 0.5) * circ * 0.35;
+    vx += Math.cos(a) * rad;
+    vy += Math.sin(a) * rad;
+
+    particles.push(makeParticle(x, y, vx, vy, Math.random() < 0.06));
+  }
+
+  function spawnComet() {
+    const margin = 20;
+    let x, y, a;
+    const edge = (Math.random() * 4) | 0;
+    if (edge === 0) { x = -margin; y = Math.random() * H; }
+    else if (edge === 1) { x = W + margin; y = Math.random() * H; }
+    else if (edge === 2) { x = Math.random() * W; y = -margin; }
+    else { x = Math.random() * W; y = H + margin; }
+    a = Math.random() * Math.PI * 2;
+    const sp = 60 + Math.random() * 240;     // px/s
+    particles.push(makeParticle(x, y, Math.cos(a) * sp, Math.sin(a) * sp, true));
+  }
+
+  function clearAll() {
+    stars.length = 0;
+    particles.length = 0;
+    shocks.length = 0;
+  }
+
+  /* ---------------------------------- simulation ---------------------------------- */
+
+  function step(dt) {
+    time += dt * 60;
+
+    // desired particle count grows with the number of stars
+    const desired = Math.min(MAX_PARTICLES, (500 + stars.length * 300) * perfScale);
+
+    // emit from each star
+    for (let j = 0; j < stars.length; j++) {
+      const s = stars[j];
+      s.pulse *= 0.90;
+      if (particles.length < desired && Math.random() < 0.6) emitFromStar(s);
+    }
+    // ambient comets drifting in from the edges
+    if (particles.length < desired && Math.random() < 0.35) spawnComet();
+
+    const halfW = W / 2, halfH = H / 2;
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      let ax = 0, ay = 0;
+
+      // gravity from every star, with toroidal wrapping (shortest distance)
+      for (let j = 0; j < stars.length; j++) {
+        const s = stars[j];
+        let dx = p.x - s.x, dy = p.y - s.y;
+        if (dx > halfW) dx -= W; else if (dx < -halfW) dx += W;
+        if (dy > halfH) dy -= H; else if (dy < -halfH) dy += H;
+        const d2 = dx * dx + dy * dy + SOFT * SOFT;
+        const d = Math.sqrt(d2);
+        const a = s.strength / d2;
+        ax -= a * (dx / d);   // attractive: pull toward the star
+        ay -= a * (dy / d);
+      }
+
+      p.vx = (p.vx + ax * dt) * DRAG;
+      p.vy = (p.vy + ay * dt) * DRAG;
+
+      // stability clamp
+      const v2 = p.vx * p.vx + p.vy * p.vy;
+      if (v2 > MAX_SPEED * MAX_SPEED) {
+        const m = MAX_SPEED / Math.sqrt(v2);
+        p.vx *= m; p.vy *= m;
+      }
+
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+
+      // wrap around screen edges
+      if (p.x < -20) p.x += W + 40; else if (p.x > W + 20) p.x -= W + 40;
+      if (p.y < -20) p.y += H + 40; else if (p.y > H + 20) p.y -= H + 40;
+
+      // absorption into a star
+      for (let j = 0; j < stars.length; j++) {
+        const s = stars[j];
+        const dx = p.x - s.x, dy = p.y - s.y;
+        const rr = s.radius + 4;
+        if (dx * dx + dy * dy < rr * rr) {
+          s.pulse = Math.min(2.5, s.pulse + 0.5);
+          particles[i] = particles[particles.length - 1];
+          particles.pop();
+          break;
+        }
+      }
+    }
+  }
+
+  /* ---------------------------------- rendering ---------------------------------- */
+
+  function draw() {
+    // fade previous frame -> glowing trails
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = 'rgba(3,5,15,0.16)';
+    ctx.fillRect(0, 0, W, H);
+
+    // twinkling background stars
+    for (let i = 0; i < bgStars.length; i++) {
+      const b = bgStars[i];
+      const tw = 0.5 + 0.5 * Math.sin(time * 0.02 * b.sp + b.ph);
+      ctx.fillStyle = 'rgba(' + b.c + ',' + b.c + ',' + Math.min(255, b.c + 20) + ',' + (0.22 + 0.5 * tw) + ')';
+      ctx.fillRect(b.x * W, b.y * H, b.r, b.r);
+    }
+
+    // everything glowing below is additive
+    ctx.globalCompositeOperation = 'lighter';
+
+    // faint nebula wash
+    ctx.globalAlpha = 0.05;
+    const nw = W * 0.9, nh = H * 0.9;
+    ctx.drawImage(nebulaA, -nw * 0.3, -nh * 0.2, nw, nh);
+    ctx.drawImage(nebulaB, W - nw * 0.7, H - nh * 0.7, nw * 0.9, nh * 0.9);
+    ctx.globalAlpha = 1;
+
+    // stars
+    for (let i = 0; i < stars.length; i++) {
+      const s = stars[i];
+      const pulse = 1 + s.pulse * 0.25;
+      const gr = s.radius * 7 * pulse * (0.9 + 0.1 * Math.sin(time * 0.02 * s.tw + s.phase));
+      ctx.drawImage(starSprites[s.ci], s.x - gr, s.y - gr, gr * 2, gr * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.radius * 0.42, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // particles
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      const sz = p.size;
+      ctx.drawImage(particleSprites[p.si], p.x - sz / 2, p.y - sz / 2, sz, sz);
+    }
+
+    // click shockwaves
+    for (let i = shocks.length - 1; i >= 0; i--) {
+      const s = shocks[i];
+      s.r += (s.maxR - s.r) * 0.12 + 2;
+      s.a *= 0.94;
+      if (s.a < 0.02) { shocks.splice(i, 1); continue; }
+      ctx.strokeStyle = 'rgba(190,215,255,' + s.a + ')';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /* ---------------------------------- main loop ---------------------------------- */
+
+  let last = performance.now();
+  let accumulator = 0;
+  let perfTimer = 0, perfFrames = 0, avgDt = 16;
+  let countFrame = 0;
+
+  function loop(now) {
+    let frameMs = now - last;
+    last = now;
+    if (frameMs < 0) frameMs = 0;
+    if (frameMs > 100) frameMs = 100;   // clamp after tab switch
+
+    // fixed-timestep physics (frame-rate independent, stable orbits)
+    accumulator += frameMs / 1000;
+    let n = 0;
+    while (accumulator >= STEP && n < 5) {
+      step(STEP);
+      accumulator -= STEP;
+      n++;
+    }
+    if (n === 5) accumulator = 0;       // drop backlog rather than spiral
+
+    // adaptive particle budget to hold ~60fps
+    perfTimer += frameMs; perfFrames++;
+    if (perfTimer >= 1000) {
+      avgDt = perfTimer / perfFrames;
+      if (avgDt > 22) perfScale = Math.max(0.3, perfScale - 0.1);
+      else if (avgDt < 13) perfScale = Math.min(1.6, perfScale + 0.05);
+      perfTimer = 0; perfFrames = 0;
+    }
+
+    draw();
+
+    if (++countFrame % 12 === 0) {
+      countEl.textContent = stars.length + ' stars \u00B7 ' + particles.length + ' particles';
+    }
+
+    requestAnimationFrame(loop);
+  }
+
+  /* ---------------------------------- resize & input ---------------------------------- */
+
+  function resize() {
+    dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  window.addEventListener('resize', resize);
+
+  function hideHint() {
+    hintEl.style.opacity = '0';
+  }
+
+  canvas.addEventListener('pointerdown', function (e) {
+    e.preventDefault();
+    addStar(e.clientX, e.clientY);
+    hideHint();
+  });
+
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'c' || e.key === 'C') {
+      clearAll();
+    }
+  });
+
+  /* ---------------------------------- go ---------------------------------- */
+
+  resize();
+  // a small starter constellation so the playground is alive immediately
+  addStar(W * 0.42, H * 0.50);
+  addStar(W * 0.62, H * 0.38);
+  addStar(W * 0.50, H * 0.68);
+
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
