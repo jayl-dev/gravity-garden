@@ -13,6 +13,10 @@ The physics simulation looks a bit weird with this initial version so I asked it
 
 ----------------
 
+*Update #4: here's a variation from deepseek v4 pro - [deepseek-v4-pro-galayx.html](https://jayl-dev.github.io/gravity-garden/deepseek-v4-pro-galayx.html) After the first revision, I did not like the physic simulation. I asked it to check and fix. Similar to gpt 5.6 sol, it found the issue and fixed it. This one looks awesome as well - love the artistic choices it made. 
+
+----------------
+
 I was recently quite impressed with Claude's coding abilities, so I decided to test its limits.
 
 I gave the AI a simple, open-ended prompt: "Write something interesting and demo it to me." After processing for a moment, it apparently decided that "interesting" + "demo" = javaScript particle simulation. It then spent a bit more time "thinking" and eventually generated this slop [vibe-coded.html](https://jayl-dev.github.io/gravity-garden/vibe-coded.html)
