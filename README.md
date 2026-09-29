@@ -3,7 +3,7 @@
 - I then fed this to claude.ai Fable 5 model on the web chat (so that it doesn't have access to the codes in this project) - this is what it created: [stellar-garden.html](https://jayl-dev.github.io/gravity-garden/stellar-garden.html)
 I didn't read thru what it wrote but I ran it and it looked and behave very much like the end result that I created - except that it wrote it from scratch in a few minutes, vs me spent a couple of hours just to fix the initial vibe coded version :)
 
-update: here's a variation from Fable 5.5 [stardust-loom](https://claude.ai/artifact/9qhRYUUDg5GdnqBJXr5Ddn)
+update: here's a variation from Fable 5.5 [stardust-loom](https://claude.ai/artifact/9qhRYUUDg5GdnqBJXr5Ddn) and Sonnet 5.5 [stardrift](https://claude.ai/artifact/QTSbdMffXL6Ro8ggxSMJh1)
 ----------------
 
 *Update #2: I gave the same prompt in chatgpt.com with the new gpt 5.6 sol model - here's what it created - [cosmic_playground.html](https://jayl-dev.github.io/gravity-garden/cosmic_playground.html)
